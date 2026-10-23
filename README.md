@@ -1,5 +1,5 @@
 # Hum Kalaam
-
+https://hum-kalaam-green.vercel.app/
 Two-way communication between hearing and Deaf people, in American Sign Language
 (ASL):
 
@@ -64,74 +64,6 @@ Limits:
 | Hum Kalaam everyday, part 1 | 171 | `src/text-to-sign/lexicon-daily.js` |
 | Hum Kalaam everyday, part 2 | 273 | `src/text-to-sign/lexicon-daily-2.js` |
 | Extra spellings of existing signs (tenses, plurals, synonyms, romanised Urdu) | n/a | `src/text-to-sign/lexicon-forms.js` |
-
-Part 2 adds:
-
-- **Numbers:** zero to ten.
-- **Colours:** red, blue, green and others.
-- **More family:** grandparents, son, daughter, husband, wife, aunt, uncle, cousin.
-- **Body and health:** head, headache, stomach, cough, blood, fever, pill, emergency, dizzy.
-- **Food:** breakfast, lunch, dinner, meat, chicken, fish, egg, fruit, vegetable, cup, spoon, table, kitchen.
-- **Places and transport:** city, road, office, library, airplane, train, bus, bicycle, ticket.
-- **Things:** window, key, light, computer, paper, box, picture, phone.
-- **Leisure:** music, dance, game, football, movie, party, vacation, wedding.
-- **Animals:** dog, cat, bird, horse, cow and others.
-- **Weather and nature:** sun, moon, wind, snow, cloud, tree, flower, fire.
-- **Days and time:** the days of the week, noon, early, past, daily, sometimes, often.
-- **Everyday verbs:** around 60, such as do, believe, hope, decide, choose, find, break, fix, carry, push, pull, laugh, cry, hug, miss, worry, change, move, send, borrow, sell, leave, arrive, visit, travel, explain, share, grow, die, born, rest.
-- **Describing and small words:** dirty, wet, heavy, long, short, tall, strong, weak, rich, poor, cheap, expensive, empty, first, last, next, near, far, up, down, in, out, on, under, each, other, some, nothing, something, enough, only, very, because, about, until, important, true, fake, maybe, safe, danger, quiet, loud.
-- **School and work:** class, test, letter, number, word, story, idea, problem, meeting.
-
-Part 1 covers these areas:
-
-- **Family and people:** mother, father, sister, baby, doctor, teacher…
-- **Questions:** who, where, when, why, how, which
-- **Time:** now, today, tomorrow, morning, night, week…
-- **Food and drink:** eat, drink, water, milk, tea, hungry…
-- **Places and things:** home, school, hospital, bathroom, car, money, phone, medicine…
-- **Daily actions:** go, come, sit, sleep, wash, read, write, buy, pay, call, understand, remember…
-- **Feelings and states:** sick, hurt, tired, sad, scared, hot, cold, fine…
-
-Plurals and tenses use the same sign (ate → EAT, went → GO).
-
-Four core mappings were wrong and are now corrected:
-
-- LIKE was signed as GOOD. It now has its own sign.
-- NEED was signed as WANT. It now has its own sign.
-- MY was signed as ME. It now has its own sign.
-- OK was signed as YES. It is now fingerspelled, as are GREAT and EVERYONE.
-
-Each sign is written in the engine's notation: handshape, body place, palm and
-finger direction, and movement phases. The arm IK works out the joint angles.
-For every phase of every sign, `tests/lexicon.test.mjs` checks four things:
-
-- The arm can reach the place.
-- Contacts land within 3 cm of their target.
-- No part of the hand goes inside the head, neck or torso.
-- The left-handed version is an exact mirror of the right-handed one.
-
-These checks also found two faults in core signs (ME and LEARN), which
-`CORE_FIXES` corrects, and an engine bug that posed the left thumb on the wrong
-side. That bug is fixed in the copied `sign-handshapes.js`.
-
-## Avatars
-
-Choose one with the toggle under the stage.
-
-| Avatar | File | Skeleton |
-| --- | --- | --- |
-| Woman in hijab | `public/avatar.glb` (47 MB) | Unreal mannequin layout, 88 bones; 49 map to the signing skeleton, including every finger joint |
-| Footballer (blue kit) | `public/avatars/classic.glb` (0.6 MB, from three.ws `cz.glb`) | Canonical bone names, 52 map |
-
-`avatar.glb` stored its colour textures in the old
-`KHR_materials_pbrSpecularGlossiness` extension, which current three.js ignores,
-so it rendered grey. `scripts/fix-avatar-materials.mjs` converted its 37
-materials to the standard metallic-roughness format: the texture moves to base
-colour, and roughness = 1 − glossiness. If another GLB shows up grey, run:
-
-```
-node scripts/fix-avatar-materials.mjs public/your-avatar.glb
-```
 
 ## What this is, and what it is not
 
@@ -204,26 +136,6 @@ No real signing data exists in this project. Tuning further against the
 avatar's rendered hands would fit the avatar, not people. The next step is to
 record real signers (Deaf signers, in good light) and tune or train on those
 recordings, so this needs data the repository does not have.
-
-### Teach mode (recommended)
-
-In the camera panel, type a word, press **Record**, sign it once and lower your
-hands. Record each word 3 to 5 times. Taught words are then matched against your
-own recordings instead of the avatar's, which is far more accurate. Recordings
-stay in this browser; **Save to file** / **Load from file** back them up. When
-the camera is unsure and you tap the right suggestion, that movement is saved as
-another example of the word. In teach mode, lower your hands (or pause about
-1.5 s) between words.
-
-With the real tracker on the rendered avatar, after 3 teaching recordings per
-word: **6 of 10 exact, 8 of 10 exact or in the top 3** (before teaching: 1 and 4).
-
-The **What the camera sees** box shows live whether your body and each hand are
-tracked (fingers, or wrist only), whether it thinks you are moving or holding,
-and the closest matches with their distances. Use it to see where it fails.
-
-`tests/browser/camera-compare.html?word=hello` shows, frame by frame, the
-camera's measurements next to the reference, for diagnosing a sign.
 
 ## Other recognition pieces in three.ws
 
