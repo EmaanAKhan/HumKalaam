@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Hum Kalaam</title>
+  <meta name="description" content="Text and voice to sign language with a 3D avatar, and sign to text with your camera.">
+  <meta name="theme-color" content="#0b5e4f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M10.5 2.75a1.25 1.25 0 0 1 2.5 0V10h.5V4.25a1.25 1.25 0 0 1 2.5 0V11h.5V6.75a1.25 1.25 0 0 1 2.5 0v7.5c0 4.28-3.22 7.75-7.4 7.75-2.47 0-4.36-1.08-5.75-3.07L3.2 14.6a1.3 1.3 0 0 1 2.04-1.6L8 15.5V5.25a1.25 1.25 0 0 1 2.5 0V10z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>Hum Kalaam <span class="ur" lang="ur">ہم کلام</span></h1>
+        <p class="sub" id="top-sub">Text and voice to sign, and sign back to text</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Tab 1: text or voice to sign ─────────────────────────────────────── -->
+  <main class="layout">
+    <section class="stage-col" aria-label="Avatar">
+      <div class="stage-card">
+        <div id="stage" class="stage">
+          <p id="stage-msg" class="stage-msg" role="status">Loading avatar…</p>
+        </div>
+        <div class="caption" aria-live="polite">
+          <span id="now-word" class="now-word"></span>
+          <span id="now-letter" class="now-letter"></span>
+        </div>
+        <div class="stage-controls">
+          <button type="button" id="btn-replay" class="pill" disabled>Replay</button>
+          <button type="button" id="btn-pause" class="pill" disabled>Pause</button>
+          <button type="button" id="btn-stop" class="pill" disabled>Stop</button>
+          <button type="button" id="btn-view" class="pill" title="Reset the camera view">Reset view</button>
+        </div>
+        <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
+      </div>
+      <div class="avatar-pick" role="group" aria-label="Choose avatar">
+        <button type="button" data-avatar="/avatars/woman.glb" aria-pressed="true">Woman in hijab</button>
+        <button type="button" data-avatar="/avatar.glb" aria-pressed="false">Footballer</button>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Controls">
+      <form id="sign-form" class="composer card">
+        <label for="text" class="label">Your message</label>
+        <div class="composer-box">
+          <textarea id="text" rows="3" maxlength="400" placeholder="Type a message, e.g. Hello, nice to meet you"></textarea>
+          <div class="composer-actions">
+            <button type="button" id="btn-mic" class="mic" aria-pressed="false" title="Speak instead of typing">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+              <span id="mic-label">Speak</span>
+            </button>
+            <div class="meter" aria-hidden="true"><div id="mic-level"></div></div>
+            <button type="submit" id="btn-sign" class="primary sign-btn" disabled>
+              <span>Sign it</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 12.75h12.19l-4.72 4.72 1.06 1.06L19.06 12l-6.53-6.53-1.06 1.06 4.72 4.72H4z"/></svg>
+            </button>
+          </div>
+        </div>
+        <p id="voice-status" class="voice-status" role="status">Tap Speak and talk in English, or type and press Sign it.</p>
+        <p id="voice-live" class="voice-live" aria-live="polite"></p>
+        <p id="message" class="message" role="alert"></p>
+      </form>
+
+      <div class="card settings-card">
+        <div class="settings">
+          <label class="field">Speed
+            <select id="speed">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+            </select>
+          </label>
+          <label class="field">Signing hand
+            <select id="hand">
+              <option value="Right" selected>Right</option>
+              <option value="Left">Left</option>
+            </select>
+          </label>
+          <label class="field">Voice accent
+            <select id="voice-lang"></select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="voice-auto" checked><span>Sign each spoken sentence as soon as I finish it</span></label>
+      </div>
+
+      <div class="card">
+        <h2 class="h2">What the avatar performs</h2>
+        <ol id="result" class="result" aria-live="polite"></ol>
+        <p class="empty-hint">Your words appear here, each marked as signed, fingerspelled or left out.</p>
+        <p class="legend">
+          <span class="chip signed">signed</span>
+          <span class="chip spelled">fingerspelled</span>
+          <span class="chip omitted">omitted</span>
+          <span class="chip unsupported">not supported</span>
+        </p>
+      </div>
+
+      <details class="card vocab">
+        <summary>Vocabulary <span class="count" id="vocab-count"></span></summary>
+        <p class="small">Tap a word to add it to your message. Any other English word is fingerspelled. Words with a dashed border are Hum Kalaam's everyday additions.</p>
+        <div class="vocab-tools"><input id="vocab-filter" type="search" placeholder="Search words" aria-label="Find a word in the vocabulary"></div>
+        <div id="vocab-list" class="vocab-list"></div>
+      </details>
+
+      <details class="card about">
+        <summary>What this is, and what it is not</summary>
+        <ul class="small">
+          <li>All signs are authored from standard descriptions of ASL citation signs: 32 come from the three.ws engine, the rest are Hum Kalaam's everyday additions in the same notation. None have been reviewed by Deaf signers yet.</li>
+          <li>This is ASL vocabulary in English word order (signed English). It is not ASL grammar, and it is not Pakistani Sign Language.</li>
+          <li>Words without a sign are fingerspelled, never replaced by a similar sign. Text in other scripts, such as Urdu, is reported as not supported.</li>
+          <li>Use it alongside text, not instead of a human interpreter.</li>
+        </ul>
+      </details>
+    </section>
+  </main>
+
+  <!-- ── Tab 2: sign to text ──────────────────────────────────────────────── -->
+  <section class="camera-wrap" aria-labelledby="cam-title">
+    <div class="camera-grid">
+      <div class="cam-col">
+        <div class="cam-view">
+          <video id="cam-video" muted playsinline></video>
+          <canvas id="cam-overlay" aria-hidden="true"></canvas>
+          <p id="cam-status" class="stage-msg" role="status">Camera off.</p>
+          <div class="cam-now">
+            <span class="label">Now</span>
+            <span id="cam-current" class="cam-current" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="cam-buttons">
+          <button type="button" id="btn-cam" class="primary">Start camera</button>
+          <button type="button" id="btn-say" disabled>Read aloud</button>
+          <button type="button" id="btn-clear-cam">Clear</button>
+        </div>
+      </div>
+
+      <div class="cam-out">
+        <div class="card transcript">
+          <h2 id="cam-title" class="h2">Sign to text</h2>
+          <p id="cam-text" class="cam-text" aria-live="polite"></p>
+          <div id="cam-suggest" class="cam-suggest" hidden></div>
+          <label class="check"><input type="checkbox" id="cam-speak" checked><span>Read each sentence aloud when I lower my hands</span></label>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 class="h2">Words it knows</h2>
+            <span class="badge">20 built in</span>
+          </div>
+          <p id="cam-core-list" class="core-list"></p>
+          <label class="check"><input type="checkbox" id="cam-core" checked><span>Only these 20 words (much more accurate). Untick to try every sign, then restart the camera.</span></label>
+        </div>
+
+        <div class="card teach">
+          <h2 class="h2">Teach it a word</h2>
+          <p class="small">Type a word, press Record, sign it once and lower your hands. Record each word 3 to 5 times. Taught words are recognised best.</p>
+          <div class="teach-row">
+            <input id="teach-word" list="teach-words" placeholder="Word, e.g. hello" aria-label="Word to teach" autocomplete="off">
+            <datalist id="teach-words"></datalist>
+            <button type="button" id="btn-record" disabled>Record</button>
+          </div>
+          <p id="teach-status" class="voice-status" role="status">Start the camera to record.</p>
+          <ul id="teach-list" class="teach-list"></ul>
+          <div class="buttons">
+            <button type="button" id="btn-teach-export">Save to file</button>
+            <label class="file-btn">Load from file<input type="file" id="teach-import" accept="application/json,.json" hidden></label>
+          </div>
+        </div>
+
+        <details class="card debug">
+          <summary>What the camera sees</summary>
+          <dl id="cam-debug" class="debug-grid">
+            <dt>Body</dt><dd data-k="body">–</dd>
+            <dt>Right hand</dt><dd data-k="right">–</dd>
+            <dt>Left hand</dt><dd data-k="left">–</dd>
+            <dt>State</dt><dd data-k="state">–</dd>
+            <dt>Matching</dt><dd data-k="mode">–</dd>
+            <dt>Last sign</dt><dd data-k="last">–</dd>
+          </dl>
+        </details>
+
+        <details class="card about">
+          <summary>How to sign for the camera</summary>
+          <ul class="small">
+            <li>Keep both shoulders and your hands in view, in good light. Lower your hands between sentences.</li>
+            <li><strong>Signs:</strong> pause briefly (about half a second) after each sign. If it is not sure, it does not guess: you get the closest matches to pick from.</li>
+            <li><strong>Fingerspelling:</strong> hold each letter still at shoulder height for about half a second. J and Z are not recognised.</li>
+            <li>It was tuned on the avatar's own signing with simulated camera noise, not on real signers, so expect mistakes until it is tested with real people.</li>
+            <li>Video stays on this device: tracking runs in the browser.</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="/main.js"></script>
+  <script type="module" src="/src/app-shell.js"></script>
+</body>
+</html>

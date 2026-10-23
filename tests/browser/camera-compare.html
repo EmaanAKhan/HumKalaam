@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Camera vs avatar features</title>
+<style>body{margin:0;font:13px system-ui}#stage{width:640px;height:640px}</style></head>
+<body>
+  <div id="stage"></div>
+  <pre id="out">Loading…</pre>
+  <script type="module">
+    // Diagnostic: for one sign, compare what the camera pipeline reports (real
+    // MediaPipe on the rendered avatar) with the avatar's own feature values at
+    // the same moment. /tests/browser/camera-compare.html?word=hello
+    import { AvatarStage } from '/src/avatar/stage.js';
+    import { CameraTracker } from '/src/camera/camera-tracker.js';
+    import { cameraFeatures, poseFeatures } from '/src/camera/features.js';
+    import { evaluateClip } from '/src/camera/templates.js';
+    import { buildClip } from '/src/text-to-sign/lexicon.js';
+    import { planUtterance } from '/src/text-to-sign/plan.js';
+
+    const word = new URLSearchParams(location.search).get('word') || 'hello';
+    const stage = new AvatarStage(document.getElementById('stage'));
+    stage.renderer.setPixelRatio(1);
+    stage.renderer.setClearColor(0xd9dde6, 1);
+    await stage.load(new URLSearchParams(location.search).get('avatar') || '/avatar.glb');
+    stage.camera.fov = 40;
+    stage.camera.position.set(0, 1.32, 1.35);
+    stage.controls.target.set(0, 1.3, 0);
+    stage.controls.update();
+    stage.camera.updateProjectionMatrix();
+    const tracker = new CameraTracker({ video: document.createElement('video'), onFrame() {} });
+    await tracker._loadModels();
+
+    const plan = planUtterance(word);
+    const canonical = buildClip(word, { dominant: 'Right' });
+    await stage.play(plan.clip);
+    stage.togglePause();
+    stage.utterance.stopFading().setEffectiveWeight(1);
+    const rest = stage.anim.actions.get('rest');
+    rest.stopFading();
+    rest.setEffectiveWeight(0);
+
+    const f2 = (p) => (p ? p.map((v) => v.toFixed(2)).join(',') : '   -    ');
+    const lines = ['t     | cam dom      | avatar dom   | cam other    | avatar other | cam shape (idx,mid,ring,pinky,thumb,spread,pinch)  | avatar shape'];
+    let clock = 1000;
+    const bodyState = {};
+    for (let t = 0; t <= plan.duration; t += plan.duration / 12) {
+      stage.utterance.time = t;
+      stage.anim.mixer.update(0);
+      stage.renderer.render(stage.scene, stage.camera);
+      const obs = tracker.detect(stage.renderer.domElement, (clock += 66));
+      const cam = cameraFeatures(obs, { width: 640, height: 640, state: bodyState });
+      const ref = poseFeatures(evaluateClip(canonical, Math.min(t, canonical.duration)));
+      lines.push(`${t.toFixed(2)} | ${f2(cam?.dom?.pos)} | ${f2(ref.dom.pos)} | ${f2(cam?.other?.pos)} | ${f2(ref.other.pos)} | ${f2(cam?.dom?.shape)} | ${f2(ref.dom.shape)}`);
+    }
+    const sh = (() => { const o = tracker.detect(stage.renderer.domElement, (clock += 66)); return o.pose ? [o.pose[11], o.pose[12]].map((q) => `${q.x.toFixed(3)},${q.y.toFixed(3)}`).join(' / ') : '-'; })();
+    lines.push(`pose shoulders (11 / 12): ${sh}`);
+    document.getElementById('out').textContent = lines.join('\n');
+    window.compareDone = lines;
+  </script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Camera end-to-end check</title>
+  <style>
+    body { margin: 0; font: 14px system-ui, sans-serif; background: #f4f6fb; color: #172033; }
+    #stage { width: 640px; height: 640px; }
+    main { display: flex; gap: 16px; padding: 12px; flex-wrap: wrap; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #ccd3e0; padding: 4px 8px; text-align: left; }
+    .ok { color: #1f9d5a; font-weight: 700; } .bad { color: #c62f3a; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="stage"></div>
+    <div>
+      <p id="status">Loading…</p>
+      <table><thead><tr><th>Signed by avatar</th><th>Hands found</th><th>Recognised</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+  </main>
+  <script type="module">
+    // End-to-end check of "sign to text" with the REAL MediaPipe trackers: the
+    // avatar performs a sign, each rendered frame (640x640, framed head to waist
+    // like a webcam) goes through HandLandmarker + PoseLandmarker, and the
+    // recogniser has to name the sign. Open /tests/browser/camera-e2e.html on
+    // the dev server; add ?words=hello,thank,mother to choose the signs.
+    import { AvatarStage } from '/src/avatar/stage.js';
+    import { CameraTracker } from '/src/camera/camera-tracker.js';
+    import { cameraFeatures } from '/src/camera/features.js';
+    import { SignRecognizer, classifyLetter, STATIC_LETTERS } from '/src/camera/recognizer.js';
+    import { compact } from '/src/camera/teach.js';
+    import { isActive } from '/src/camera/features.js';
+    import { buildFingerspellingClip } from '/src/vendor/three-ws/fingerspelling.js';
+    import { allTemplates } from '/src/camera/templates.js';
+    import { planUtterance } from '/src/text-to-sign/plan.js';
+
+    const params = new URLSearchParams(location.search);
+    const words = (params.get('words') || 'mother,water,home,school,sick,where,eat,drink,help,friend').split(',');
+    // ?letters=1 checks the manual alphabet instead of signs.
+    const lettersMode = params.has('letters');
+    // ?teach=1 first records 3 samples of each word (camera moved a little and
+    // signing speed varied each time), then tests a new performance against them.
+    const teachMode = params.has('teach');
+    const avatar = params.get('avatar') || '/avatar.glb';
+    const fps = Number(params.get('fps') || 15);
+    const status = document.getElementById('status');
+    const rows = document.getElementById('rows');
+
+    const stage = new AvatarStage(document.getElementById('stage'));
+    stage.renderer.setPixelRatio(1);
+    stage.renderer.setClearColor(0xd9dde6, 1);
+    await stage.load(avatar);
+    stage.camera.fov = 40;
+    // ?dist=0.9&x=-0.15&y=1.45 moves the virtual webcam (metres).
+    const camX = Number(params.get('x') ?? 0), camY = Number(params.get('y') ?? 1.3), camD = Number(params.get('dist') ?? 1.35);
+    stage.camera.position.set(camX, camY + 0.02, camD);
+    stage.controls.target.set(camX, camY, 0);
+    stage.controls.update();
+    stage.camera.updateProjectionMatrix();
+
+    const tracker = new CameraTracker({ video: document.createElement('video'), onFrame() {} });
+    await tracker._loadModels();
+    const templates = allTemplates('Right');
+    let clock = 1000;
+    const bodyState = {};
+    const results = [];
+
+    function setCamera(dx = 0, dd = 0) {
+      stage.camera.position.set(camX + dx, camY + 0.02, camD + dd);
+      stage.controls.target.set(camX + dx, camY, 0);
+      stage.controls.update();
+    }
+
+    async function capture(word, speed = 1) {
+      const plan = planUtterance(word);
+      await stage.play(plan.clip);
+      stage.togglePause();
+      // Skip the fade from the resting pose: frames are stepped by hand here.
+      stage.utterance.stopFading().setEffectiveWeight(1);
+      const rest = stage.anim.actions.get('rest');
+      rest.stopFading();
+      rest.setEffectiveWeight(0);
+      const frames = [];
+      let withHands = 0;
+      for (let t = 0; t <= plan.duration + 0.4; t += speed / fps) {
+        stage.utterance.time = Math.min(t, plan.duration);
+        stage.anim.mixer.update(0);
+        stage.renderer.render(stage.scene, stage.camera);
+        const obs = tracker.detect(stage.renderer.domElement, (clock += 1000 / fps));
+        if (obs.hands.length) withHands++;
+        frames.push({ f: cameraFeatures(obs, { width: 640, height: 640, dominant: 'Right', state: bodyState }), t: clock });
+      }
+      stage.togglePause();
+      rest.setEffectiveWeight(1);
+      return { frames, withHands };
+    }
+
+    if (lettersMode) {
+      // Each static letter held still at the spelling place, read by the real hand tracker.
+      const marks = [];
+      const clip = buildFingerspellingClip(STATIC_LETTERS.join(''), { holdSeconds: 0.6, marks });
+      stage.anim.injectClip('letters', clip, { loop: false });
+      const action = stage.anim.actions.get('letters');
+      action.play();
+      action.paused = true;
+      action.setEffectiveWeight(1);
+      const rest = stage.anim.actions.get('rest');
+      rest.stopFading();
+      rest.setEffectiveWeight(0);
+      let right = 0, seen = 0;
+      for (const m of marks.filter((x) => x.letter !== ' ')) {
+        action.time = (m.start + m.end) / 2;
+        stage.anim.mixer.update(0);
+        stage.renderer.render(stage.scene, stage.camera);
+        const obs = tracker.detect(stage.renderer.domElement, (clock += 100));
+        const f = cameraFeatures(obs, { width: 640, height: 640, dominant: 'Right', state: bodyState });
+        let got = '(no hand)';
+        if (f?.dom?.world) { seen++; got = classifyLetter(f.dom).letter; }
+        if (got === m.letter) right++;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${m.letter}</td><td>${f?.dom?.world ? 'yes' : 'no'}</td><td class="${got === m.letter ? 'ok' : 'bad'}">${got}</td>`;
+        rows.append(tr);
+        results.push({ word: m.letter, got: [got], ok: got === m.letter, inTop3: got === m.letter });
+      }
+      status.textContent = `Letters: ${right} of ${results.length} read correctly (hand found in ${seen}).`;
+      window.e2eResults = results;
+    }
+
+    const taught = [];
+    if (teachMode) {
+      const variations = [[-0.04, -0.08, 0.85], [0.05, 0.06, 1.15], [0.0, 0.12, 1.0]];
+      for (const word of words) {
+        for (const [dx, dd, speed] of variations) {
+          status.textContent = `Teaching “${word}”…`;
+          setCamera(dx, dd);
+          const { frames } = await capture(word, speed);
+          const active = frames.map((x) => x.f).filter((f) => f && (isActive(f.dom) || isActive(f.other)));
+          if (active.length >= 6) taught.push({ word: word.toUpperCase(), frames: active.map(compact) });
+        }
+      }
+      setCamera(0.025, -0.03); // the test performance: yet another position
+    }
+
+    for (const word of lettersMode ? [] : words) {
+      status.textContent = `Signing “${word}”…`;
+      const { frames, withHands } = await capture(word, teachMode ? 0.92 : 1);
+      const events = [];
+      const rec = new SignRecognizer({ templates, taught, onEvent: (e) => events.push(e) });
+      for (const { f, t } of frames) rec.push(f, t);
+      for (let i = 0; i < 40; i++) rec.push(null, (clock += 1000 / fps));
+      const got = events
+        .filter((e) => ['word', 'spelled', 'unknown'].includes(e.type))
+        .map((e) => (e.type === 'unknown' ? `? (${e.detail.candidates.slice(0, 3).map((c) => c.word.toLowerCase()).join(', ')})` : e.text.toLowerCase()));
+      const ok = got.length === 1 && got[0] === word.toLowerCase();
+      const inTop3 = ok || events.some((e) => e.type === 'unknown' && e.detail.candidates.slice(0, 3).some((c) => c.word === word.toUpperCase()));
+      results.push({ word, frames: frames.length, withHands, got, ok, inTop3 });
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${word}</td><td>${withHands}/${frames.length}</td><td class="${ok ? 'ok' : 'bad'}">${got.join(' + ') || '(nothing)'}</td>`;
+      rows.append(tr);
+    }
+    if (!lettersMode) {
+      const right = results.filter((r) => r.ok).length;
+      const top3 = results.filter((r) => r.inTop3).length;
+      status.textContent = `Done${teachMode ? ' (taught, ' + taught.length + ' samples)' : ''}: ${right} of ${results.length} recognised exactly; ${top3} of ${results.length} exact or offered among the top 3 suggestions.`;
+      window.e2eResults = results;
+    }
+  </script>
+</body>
+</html>
