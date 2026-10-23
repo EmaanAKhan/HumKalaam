@@ -546,8 +546,3 @@ details ul.small { padding-left: 18px; display: grid; gap: 6px; }
   .top h1 .ur { display: none; }
 }
 
-/* avatar choice, under the stage */
-.avatar-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 10px; padding: 4px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
-.avatar-pick button { min-height: 40px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 14px; }
-.avatar-pick button[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand-ink); }
-@media (min-width: 960px) { .stage-card { height: calc(100dvh - 86px - 22px - var(--tabbar-h) - 28px - 60px); } }
